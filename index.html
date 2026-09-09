@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EMC Location - Réservation de Matériel Événementiel</title>
+    <style>
+        :root {
+            --primary: #1e3a8a;
+            --secondary: #d97706;
+            --accent: #2563eb;
+            --bg-color: #f8fafc;
+            --text-color: #1e293b;
+            --danger: #dc2626;
+            --success: #16a34a;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-color); line-height: 1.6; }
+        
+        header { background: linear-gradient(135deg, var(--primary), #1e293b); color: white; padding: 2rem 1rem; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        header h1 { font-size: 2.2rem; margin-bottom: 0.5rem; }
+        header p { font-size: 1.1rem; opacity: 0.9; }
+        
+        .container { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; }
+        
+        /* Bannière Horaire & Alerte */
+        .alert-banner { padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; text-align: center; font-weight: bold; display: none; }
+        .alert-error { background-color: #fee2e2; color: var(--danger); border: 1px solid #f87171; }
+        .alert-success { background-color: #dcfce7; color: var(--success); border: 1px solid #4ade80; }
+
+        /* Grille des produits - Optimisée Mobile / Desktop */
+        .catalog-title { font-size: 1.5rem; margin-bottom: 1rem; color: var(--primary); border-bottom: 2px solid var(--secondary); padding-bottom: 0.5rem; }
+        .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-bottom: 2rem; }
+        
+        @media (max-width: 900px) {
+            .grid { grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+        }
+        @media (max-width: 600px) {
+            .grid { grid-template-columns: 1fr; }
+            header h1 { font-size: 1.8rem; }
+        }
+
+        .card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05); transition: transform 0.2s; display: flex; flex-direction: column; justify-content: space-between; }
+        .card:hover { transform: translateY(-3px); }
+        .card img { width: 100%; height: 180px; object-fit: contain; background: #fff; padding: 10px; border-bottom: 1px solid #f1f5f9; }
+        .card-body { padding: 1.2rem; flex-grow: 1; display: flex; flex-direction: column; justify-content: space-between; }
+        .card-title { font-size: 1.1rem; font-weight: bold; margin-bottom: 0.5rem; }
+        .card-price { color: var(--secondary); font-weight: bold; font-size: 1.1rem; margin-bottom: 1rem; }
+        
+        .qty-control { display: flex; align-items: center; justify-content: space-between; background: #f1f5f9; padding: 0.5rem; border-radius: 8px; }
+        .qty-control button { background: var(--primary); color: white; border: none; width: 35px; height: 35px; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 1.2rem; }
+        .qty-control button:hover { background: var(--accent); }
+        .qty-control span { font-weight: bold; font-size: 1.2rem; }
+
+        /* Formulaire & Panier */
+        .order-section { background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 2rem; }
+        .form-group { margin-bottom: 1.2rem; }
+        .form-group label { display: block; font-weight: 600; margin-bottom: 0.5rem; }
+        .form-group input, .form-group select { width: 100%; padding: 0.75rem; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 1rem; }
+        .terms-box { background: #fef3c7; border: 1px solid #f59e0b; padding: 1rem; border-radius: 8px; margin-bottom: 1.2rem; font-size: 0.9rem; }
+        .terms-box label { display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer; font-weight: normal; }
+        .terms-box input { width: auto; margin-top: 0.2rem; }
+
+        .btn-submit { background: var(--success); color: white; border: none; padding: 1rem 2rem; font-size: 1.1rem; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; transition: background 0.2s; }
+        .btn-submit:hover { background: #15803d; }
+        .btn-submit:disabled { background: #94a3b8; cursor: not-allowed; }
+
+        /* Admin Link & Panel */
+        .admin-access { text-align: center; margin: 3rem 0; }
+        .admin-link { color: var(--primary); text-decoration: underline; cursor: pointer; font-weight: 600; }
+        
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 1000; padding: 1rem; }
+        .modal-content { background: white; padding: 2rem; border-radius: 12px; width: 100%; max-width: 600px; max-height: 90vh; overflow-y: auto; position: relative; }
+        .close-btn { position: absolute; top: 1rem; right: 1rem; background: none; border: none; font-size: 1.5rem; cursor: pointer; }
+
+        /* Ticket / Reçu impression */
+        .receipt-ticket { border: 2px dashed #cbd5e1; padding: 1.5rem; margin-top: 1rem; background: #fff; font-family: monospace; }
+        .receipt-header { text-align: center; margin-bottom: 1rem; }
+        .receipt-header h2 { font-size: 1.3rem; color: var(--primary); }
+        .receipt-details table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        .receipt-details th, .receipt-details td { padding: 0.4rem; text-align: left; border-bottom: 1px solid #eee; font-size: 0.9rem; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #printable-area, #printable-area * { visibility: visible; }
+            #printable-area { position: absolute; left: 0; top: 0; width: 100%; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>EMC Location</h1>
+        <p>Service Professionnel de Location de Matériel de Réception & Restauration</p>
+        <p style="font-size: 0.9rem; margin-top: 0.3rem;">Contact : <strong>77 417 71 28</strong> (Melo Clémentine)</p>
+    </header>
+
+    <div class="container">
+        <!-- Alerte Horaires -->
+        <div id="hourAlert" class="alert-banner"></div>
+
+        <!-- Catalogue des Équipements -->
+        <h2 class="catalog-title">Catalogue & Réservation d'Équipements</h2>
+        <div class="grid" id="catalogGrid">
+            <!-- Injecté par JS -->
+        </div>
+
+        <!-- Formulaire de Validation -->
+        <div class="order-section">
+            <h2 class="catalog-title">Finaliser votre Commande</h2>
+            <form id="orderForm">
+                <div class="form-group">
+                    <label for="clientName">Nom complet du réservateur :</label>
+                    <input type="text" id="clientName" required placeholder="Ex: Arlindo Preira">
+                </div>
+                <div class="form-group">
+                    <label for="clientPhone">Numéro de téléphone :</label>
+                    <input type="tel" id="clientPhone" required placeholder="Ex: 77 000 00 00">
+                </div>
+                <div class="form-group">
+                    <label for="fulfillmentMode">Option de récupération :</label>
+                    <select id="fulfillmentMode" required>
+                        <option value="Retrait sur place">Retrait sur place (Entrepôt EMC)</option>
+                        <option value="Livraison">Livraison à domicile / sur site</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="paymentMethod">Mode de Paiement (Wave ou Orange Money uniquement) :</label>
+                    <select id="paymentMethod" required>
+                        <option value="Wave">Wave</option>
+                        <option value="Orange Money">Orange Money</option>
+                    </select>
+                    <small style="color: #64748b; display: block; margin-top: 0.3rem;">Veuillez effectuer le transfert au <strong>77 417 71 28</strong> avant de joindre la capture.</small>
+                </div>
+                <div class="form-group">
+                    <label for="paymentReceipt">Justificatif de Paiement (Capture d'écran / Photo - Max 50 Ko) :</label>
+                    <input type="file" id="paymentReceipt" accept="image/*" required>
+                    <small id="fileSizeError" style="color: var(--danger); display: none;">Le fichier dépasse la limite autorisée de 50 Ko.</small>
+                </div>
+
+                <!-- Clause de Responsabilité Obligatoire -->
+                <div class="terms-box">
+                    <label>
+                        <input type="checkbox" id="termsCheck" required>
+                        <span><strong>Avertissement & Clause de Responsabilité :</strong> "Tout dégât, casse ou perte de matériel entraîne le remboursement intégral du bien par sa valeur à dire d'expert / valeur de remplacement."</span>
+                    </label>
+                </div>
+
+                <button type="submit" id="submitBtn" class="btn-submit">VOTRE COMMANDE DOIT ÊTRE VALIDÉE AVEC SUCCÈS</button>
+            </form>
+        </div>
+
+        <!-- Accès Espace Privé Admin -->
+        <div class="admin-access">
+            <span class="admin-link" onclick="openAdminLogin()">Accès Espace Privé (Gestion & Registre)</span>
+        </div>
+    </div>
+
+    <!-- Modal Succès / Reçu -->
+    <div class="modal" id="successModal">
+        <div class="modal-content">
+            <button class="close-btn no-print" onclick="closeModal('successModal')">&times;</button>
+            <div style="text-align: center; margin-bottom: 1rem; color: var(--success);">
+                <h2>🎉 VOTRE COMMANDE A ÉTÉ VALIDÉE AVEC SUCCÈS !</h2>
+            </div>
+            <div id="printable-area">
+                <div class="receipt-header">
+                    <h2>EMC LOCATION - REÇU OFFICIEL</h2>
+                    <p>Contact : 77 417 71 28 (Melo Clémentine)</p>
+                    <p id="receiptDate"></p>
+                </div>
+                <div class="receipt-details" id="receiptContent">
+                    <!-- Généré dynamiquement -->
+                </div>
+                <div style="font-size: 0.8rem; margin-top: 1rem; border-top: 1px solid #ccc; padding-top: 0.5rem;">
+                    <p><strong>Sécurité Anti-Piratage (SHA-256) :</strong> <span id="receiptHash" style="word-break: break-all; font-size: 0.7rem;"></span></p>
+                    <p style="margin-top: 5px; text-align: center; font-style: italic;">"Tout dégât, casse ou perte de matériel entraîne le remboursement intégral du bien par sa valeur à dire d'expert / valeur de remplacement."</p>
+                </div>
+            </div>
+            <div style="margin-top: 1.5rem; text-align: center;" class="no-print">
+                <button onclick="window.print()" class="btn-submit" style="padding: 0.6rem 1.5rem; font-size: 1rem; width: auto;">Imprimer le Reçu / Registre</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Login Admin -->
+    <div class="modal" id="adminLoginModal">
+        <div class="modal-content">
+            <button class="close-btn" onclick="closeModal('adminLoginModal')">&times;</button>
+            <h2 style="margin-bottom: 1rem; color: var(--primary);">Connexion Espace Privé</h2>
+            <div class="form-group">
+                <label>Nom d'utilisateur :</label>
+                <input type="text" id="adminUser">
+            </div>
+            <div class="form-group">
+                <label>Mot de passe :</label>
+                <input type="password" id="adminPass">
+            </div>
+            <button onclick="checkAdminLogin()" class="btn-submit">Se Connecter</button>
+        </div>
+    </div>
+
+    <!-- Modal Tableau de Bord Admin -->
+    <div class="modal" id="adminDashboardModal">
+        <div class="modal-content" style="max-width: 800px;">
+            <button class="close-btn" onclick="closeModal('adminDashboardModal')">&times;</button>
+            <h2 style="margin-bottom: 1rem; color: var(--primary);">Tableau de Bord - EMC Location</h2>
+            <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap;">
+                <div style="background: #f1f5f9; padding: 1rem; border-radius: 8px; flex: 1; text-align: center; min-width: 200px;">
+                    <h3>Total Réservations</h3>
+                    <p id="statTotalOrders" style="font-size: 1.5rem; font-weight: bold; color: var(--primary);">0</p>
+                </div>
+                <div style="background: #f1f5f9; padding: 1rem; border-radius: 8px; flex: 1; text-align: center; min-width: 200px;">
+                    <h3>Chiffre d'Affaires</h3>
+                    <p id="statTotalRevenue" style="font-size: 1.5rem; font-weight: bold; color: var(--secondary);">0 FCFA</p>
+                </div>
+            </div>
+            <h3 style="margin-bottom: 0.5rem;">Liste Détaillée des Commandes</h3>
+            <div style="max-height: 300px; overflow-y: auto;">
+                <table style="width: 100%; border-collapse: collapse;" id="adminOrdersTable">
+                    <thead>
+                        <tr style="background: #e2e8f0; text-align: left;">
+                            <th style="padding: 8px;">Date</th>
+                            <th style="padding: 8px;">Client</th>
+                            <th style="padding: 8px;">Téléphone</th>
+                            <th style="padding: 8px;">Option</th>
+                            <th style="padding: 8px;">Montant</th>
+                        </tr>
+                    </thead>
+                    <tbody id="adminOrdersBody">
+                        <!-- Rempli par JS -->
+                    </tbody>
+                </table>
+            </div>
+            <div style="margin-top: 1.5rem; text-align: right;">
+                <button onclick="window.print()" class="btn-submit" style="width: auto; padding: 0.5rem 1rem;">Imprimer le Registre</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Catalogue avec correction de la syntaxe pour l'élément 5 (cuillères argentées)[cite: 1]
+        const products = [
+            { id: 1, name: "Tables rondes (Standard)", price: 5000, img: "table_ronde.PNG", fallback: "https://images.unsplash.com/photo-1530268729831-4b0b9e170218?auto=format&fit=crop&w=500&q=80" },
+            { id: 2, name: "Plateaux de service inox", price: 2000, img: "plateaux_de_service_inox.PNG", fallback: "https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=500&q=80" },
+            { id: 3, name: "Nappes de table", price: 3000, img: "nappe_de_table.PNG", fallback: "https://images.unsplash.com/photo-1519225421980-715cb0215aed?auto=format&fit=crop&w=500&q=80" },
+            { id: 4, name: "Fourchettes argentées", price: 500, img: "fourchette.PNG", fallback: "https://images.unsplash.com/photo-1615870216519-2f9fa575fa5c?auto=format&fit=crop&w=500&q=80" },
+            { id: 5, name: "Cuilleres argentees", price: 500, img: "cuilleres_argentees.PNG", fallback: "https://images.unsplash.com/photo-1615870216519-2f9fa575fa5c?auto=format&fit=crop&w=500&q=80" },
+            { id: 6, name: "Couteaux argentés", price: 500, img: "Couteau.PNG", fallback: "https://images.unsplash.com/photo-1615870216519-2f9fa575fa5c?auto=format&fit=crop&w=500&q=80" },
+            { id: 7, name: "Chafing dishes", price: 7500, img: "Chafing dish.PNG", fallback: "https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=500&q=80" }
+        ];
+
+        let cart = {};
+
+        function initCatalog() {
+            const grid = document.getElementById('catalogGrid');
+            if (!grid) return;
+            grid.innerHTML = '';
+            products.forEach(p => {
+                if (cart[p.id] === undefined) cart[p.id] = 0;
+                grid.innerHTML += `
+                    <div class="card">
+                        <img src="${p.img}" alt="${p.name}" onerror="this.onerror=null; this.src='${p.fallback}';">
+                        <div class="card-body">
+                            <div>
+                                <div class="card-title">${p.name}</div>
+                                <div class="card-price">${p.price.toLocaleString()} FCFA</div>
+                            </div>
+                            <div class="qty-control">
+                                <button type="button" onclick="updateQty(${p.id}, -1)">-</button>
+                                <span id="qty-${p.id}">${cart[p.id]}</span>
+                                <button type="button" onclick="updateQty(${p.id}, 1)">+</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function updateQty(id, delta) {
+            if (cart[id] + delta >= 0) {
+                cart[id] += delta;
+                const span = document.getElementById(`qty-${id}`);
+                if (span) span.innerText = cart[id];
+            }
+        }
+
+        function checkOpeningHours() {
+            const now = new Date();
+            const hour = now.getHours();
+            const alertBox = document.getElementById('hourAlert');
+            const submitBtn = document.getElementById('submitBtn');
+            if (!alertBox || !submitBtn) return;
+
+            if (hour >= 7 && hour < 21) {
+                alertBox.style.display = 'block';
+                alertBox.className = 'alert-banner alert-success';
+                alertBox.innerHTML = "Le service de location EMC Location est <strong>OUVERT</strong> (Horaires : 07h00 - 21h00).";
+                submitBtn.disabled = false;
+            } else {
+                alertBox.style.display = 'block';
+                alertBox.className = 'alert-banner alert-error';
+                alertBox.innerHTML = "Le service est actuellement <strong>FERMÉ</strong>. Nos horaires d'ouverture sont de 07h00 à 21h00. Les réservations en ligne sont suspendues.";
+                submitBtn.disabled = true;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const receiptInput = document.getElementById('paymentReceipt');
+            if (receiptInput) {
+                receiptInput.addEventListener('change', function(e) {
+                    const file = e.target.files[0];
+                    const errorSpan = document.getElementById('fileSizeError');
+                    const submitBtn = document.getElementById('submitBtn');
+                    if (file && file.size > 50000) {
+                        if (errorSpan) errorSpan.style.display = 'block';
+                        if (submitBtn) submitBtn.disabled = true;
+                    } else {
+                        if (errorSpan) errorSpan.style.display = 'none';
+                        const now = new Date().getHours();
+                        if (now >= 7 && now < 21 && submitBtn) submitBtn.disabled = false;
+                    }
+                });
+            }
+
+            const orderForm = document.getElementById('orderForm');
+            if (orderForm) {
+                orderForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+
+                    let totalQty = Object.values(cart).reduce((a, b) => a + b, 0);
+                    if (totalQty === 0) {
+                        alert("Veuillez sélectionner au moins un équipement à réserver.");
+                        return;
+                    }
+
+                    const clientName = document.getElementById('clientName').value;
+                    const clientPhone = document.getElementById('clientPhone').value;
+                    const fulfillmentMode = document.getElementById('fulfillmentMode').value;
+                    const paymentMethod = document.getElementById('paymentMethod').value;
+
+                    let totalAmount = 0;
+                    let itemsSummary = "";
+
+                    products.forEach(p => {
+                        if (cart[p.id] > 0) {
+                            let subTotal = cart[p.id] * p.price;
+                            totalAmount += subTotal;
+                            itemsSummary += `${p.name} x${cart[p.id]} (${subTotal.toLocaleString()} FCFA)<br>`;
+                        }
+                    });
+
+                    const orderData = {
+                        date: new Date().toLocaleString(),
+                        name: clientName,
+                        phone: clientPhone,
+                        fulfillment: fulfillmentMode,
+                        payment: paymentMethod,
+                        total: totalAmount,
+                        items: itemsSummary
+                    };
+
+                    const rawString = `${orderData.date}-${orderData.name}-${orderData.total}-${orderData.phone}`;
+                    const secureHash = await sha256(rawString);
+
+                    let orders = JSON.parse(localStorage.getItem('emc_orders') || '[]');
+                    orders.push({ ...orderData, hash: secureHash });
+                    localStorage.setItem('emc_orders', JSON.stringify(orders));
+
+                    document.getElementById('receiptDate').innerText = `Date : ${orderData.date}`;
+                    document.getElementById('receiptContent').innerHTML = `
+                        <table>
+                            <tr><td><strong>Client :</strong></td><td>${orderData.name}</td></tr>
+                            <tr><td><strong>Téléphone :</strong></td><td>${orderData.phone}</td></tr>
+                            <tr><td><strong>Mode :</strong></td><td>${orderData.fulfillment}</td></tr>
+                            <tr><td><strong>Paiement :</strong></td><td>${orderData.payment} (Vérifié au 77 417 71 28)</td></tr>
+                            <tr><td colspan="2"><strong>Détails du matériel :</strong><br>${orderData.items}</td></tr>
+                            <tr><td><strong>Montant Total :</strong></td><td><strong>${orderData.total.toLocaleString()} FCFA</strong></td></tr>
+                        </table>
+                    `;
+                    document.getElementById('receiptHash').innerText = secureHash;
+
+                    document.getElementById('successModal').style.display = 'flex';
+                    orderForm.reset();
+                    cart = {};
+                    initCatalog();
+                });
+            }
+        });
+
+        async function sha256(message) {
+            const msgBuffer = new TextEncoder().encode(message);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return hashHex;
+        }
+
+        function openAdminLogin() {
+            document.getElementById('adminLoginModal').style.display = 'flex';
+        }
+
+        function checkAdminLogin() {
+            const user = document.getElementById('adminUser').value;
+            const pass = document.getElementById('adminPass').value;
+
+            if (user === "EMC" && pass === "AZERTYUIOPAZERTYUIOPEMC") {
+                document.getElementById('adminLoginModal').style.display = 'none';
+                document.getElementById('adminUser').value = '';
+                document.getElementById('adminPass').value = '';
+                loadAdminDashboard();
+                document.getElementById('adminDashboardModal').style.display = 'flex';
+            } else {
+                alert("Identifiant ou mot de passe incorrect.");
+            }
+        }
+
+        function loadAdminDashboard() {
+            const orders = JSON.parse(localStorage.getItem('emc_orders') || '[]');
+            document.getElementById('statTotalOrders').innerText = orders.length;
+            
+            let totalRev = orders.reduce((acc, curr) => acc + curr.total, 0);
+            document.getElementById('statTotalRevenue').innerText = totalRev.toLocaleString() + " FCFA";
+
+            const tbody = document.getElementById('adminOrdersBody');
+            tbody.innerHTML = '';
+            orders.forEach(o => {
+                tbody.innerHTML += `
+                    <tr style="border-bottom: 1px solid #eee;">
+                        <td style="padding: 8px; font-size: 0.85rem;">${o.date}</td>
+                        <td style="padding: 8px;">${o.name}</td>
+                        <td style="padding: 8px;">${o.phone}</td>
+                        <td style="padding: 8px;">${o.fulfillment}</td>
+                        <td style="padding: 8px; font-weight: bold;">${o.total.toLocaleString()} FCFA</td>
+                    </tr>
+                `;
+            });
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        window.onload = function() {
+            initCatalog();
+            checkOpeningHours();
+            setInterval(checkOpeningHours, 60000);
+        };
+    </script>
+</body>
+</html>
